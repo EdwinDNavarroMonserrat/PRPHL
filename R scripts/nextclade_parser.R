@@ -1,11 +1,16 @@
-# =====================================
+# ===================================================
 # Script for automated influenza reporting
 # Written by Edwin Daniel Navarro Monserrat
 # Automated influenza Nextclade cleanup script
 # Reads all .tsv files from H1 and H3 folders,
 # extracts Sample ID and Segment from seqName,
 # keeps selected columns, and writes one CSV.
-# =====================================
+# Sample name was added to HA fasta headers prior
+# to running this script
+# Feel free to reach out if you want the Bash script
+# that adds sample names to fasta headers and file names
+# edit directories as needed
+# ======================================================
 
 # Software
 library(tidyverse)
