@@ -1,0 +1,242 @@
+---
+title: "Reporte de Analisis Bioinformáticos - Patogenos HAI"
+Subtitle: "Resultados de Genotipificación e Identificación de Genes de Resistencia, Virulencia y Replicones Plasmisdicos Generados por el Laboratorio de Genómica - ILSP"
+author: "Edwin Daniel Navarro Monserrat, PhD"
+date: today
+format:
+  html:
+    toc: true
+    toc-title: "![](logo_dept_salud.png){height=100px}"
+    toc-location: left
+    number-sections: true
+    embed-resources: true
+  pdf:
+    toc: true
+    number-sections: true
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+## Introducción
+
+Este reporte resume los resultados de los análisis bioinformáticos realizados utilizando los *pipelines* PHoeNIx (<https://github.com/CDCgov/phoenix>) y Grandeur (<https://github.com/UPHL-BioNGS/Grandeur>). Ambos *pipelines* están diseñados para el análisis de patógenos bacterianos y siguen las mejores prácticas de reproducibilidad, asegurando procesos estandarizados, trazables y consistentes para la caracterización genómica.
+
+## Análisis bioinformáticos
+
+Los análisis bioinformáticos presentados en este reporte provienen de las herramientas internas integradas en los *pipelines* mencionados en la introducción. Estos análisis incluyen el ensamblaje de genomas, la tipificación (clasificación de género, especie, serotipo y subespecie) y la identificación de genes asociados a resistencia antimicrobiana y factores de virulencia.
+
+DE NO ESTAR INCLUIDOS, análisis adicionales relacionados con relación genómica (genomic relatedness), como estudios de proximidad genética o comparaciones entre aislamientos, pueden realizarse a petición. Para solicitar estos análisis, favor contactar a Edwin Navarro (enavarro.monserrat\@salud.pr.gov).
+
+```{r}
+#Load library
+library(knitr)
+#Load parser
+source("~/Analisis_bioinformaticos/Scripts/R_scripts/phodeur_parser.R")
+```
+
+## Resultados de Genotipificación
+
+```{r}
+knitr::kable(sample_typing)
+```
+
+## Identificación de Genes de Resistencia Antimicrobiana (AMR)
+
+```{r}
+#| echo: false
+knitr::kable(sample_ARGS)
+```
+
+## Análisis de relación genómica - matriz de distancia
+
+```{r fig.height=14, fig.width=16}
+#| eval: false
+#| include: true
+if (!is.null(snps_ska_tbl)) {
+  colnames(snps_ska_tbl)[1] <- "sample"
+
+  sample_order <- snps_ska_tbl[[1]]
+  sample_labels <- stringr::str_trunc(sample_order, width = 20)
+
+  ska_mat <- as.matrix(snps_ska_tbl[, -1])
+  rownames(ska_mat) <- sample_order
+  ska_mat <- apply(ska_mat, 2, as.numeric)
+  rownames(ska_mat) <- sample_order
+
+  ska_df <- as.data.frame(ska_mat)
+  ska_df$sample <- rownames(ska_df)
+
+  ska_long <- reshape2::melt(
+    ska_df,
+    id.vars = "sample",
+    variable.name = "sample2",
+    value.name = "distance"
+  )
+
+  ska_long$sample <- factor(ska_long$sample, levels = rev(sample_order))
+  ska_long$sample2 <- factor(ska_long$sample2, levels = sample_order)
+
+  ska_long <- ska_long |>
+    dplyr::mutate(
+      fill_distance = dplyr::case_when(
+        distance <= 25 ~ 25,
+        distance > 10000 ~ 10000,
+        TRUE ~ distance
+      ),
+      label_distance = dplyr::case_when(
+        distance > 10000 ~ "10k+",
+        TRUE ~ as.character(distance)
+      )
+    )
+
+  sample_map <- stats::setNames(sample_labels, sample_order)
+
+  ggplot2::ggplot(ska_long, ggplot2::aes(x = sample2, y = sample, fill = fill_distance)) +
+    ggplot2::geom_tile(color = "black") +
+    ggplot2::geom_text(ggplot2::aes(label = label_distance), size = 4) +
+    ggplot2::scale_fill_gradientn(
+      colours = c("#660033", "red3", "red", "#FFCC99"),
+      values = scales::rescale(c(25, 26, 1000, 10000)),
+      limits = c(25, 10000),
+      oob = scales::squish,
+      name = "SNP distance",
+      breaks = c(25, 1000, 5000, 10000),
+      labels = c("≤25", "1000", "5000", "10k+")
+    ) +
+    ggplot2::scale_x_discrete(labels = sample_map) +
+    ggplot2::scale_y_discrete(labels = rev(sample_map)) +
+    ggplot2::labs(
+      title = "Distancia SNP - SKA",
+      x = NULL,
+      y = NULL
+    ) +
+    ggplot2::guides(
+      fill = ggplot2::guide_colorbar(
+        title.position = "top",
+        title.hjust = 0.5,
+        barheight = grid::unit(8, "cm"),
+        barwidth = grid::unit(1.4, "cm"),
+        frame.colour = "black",
+        ticks.colour = "black"
+      )
+    ) +
+    ggplot2::theme_minimal() +
+    ggplot2::theme(
+      axis.text.x = ggplot2::element_text(angle = 90, hjust = 1, size = 12, face = "bold"),
+      axis.text.y = ggplot2::element_text(size = 12, face = "bold"),
+      panel.grid = ggplot2::element_blank(),
+      legend.title = ggplot2::element_text(size = 18, face = "bold"),
+      legend.text = ggplot2::element_text(size = 14, face = "bold"),
+      legend.spacing.y = grid::unit(0.4, "cm"),
+      legend.margin = ggplot2::margin(10, 10, 10, 10)
+    )
+
+} else {
+  cat("No se encontró la matriz de distancia SNP generada por SKA.\n\n")
+}
+```
+
+```{r, fig.width=16, fig.height=14}
+## Panaroo
+#| eval: false
+#| include: true
+if (!is.null(snps_panaroo_tbl)) {
+  colnames(snps_panaroo_tbl)[1] <- "sample"
+
+  sample_order <- snps_panaroo_tbl[[1]]
+  sample_labels <- stringr::str_trunc(sample_order, width = 20)
+
+  panaroo_mat <- as.matrix(snps_panaroo_tbl[, -1])
+  rownames(panaroo_mat) <- sample_order
+  panaroo_mat <- apply(panaroo_mat, 2, as.numeric)
+  rownames(panaroo_mat) <- sample_order
+
+  panaroo_df <- as.data.frame(panaroo_mat)
+  panaroo_df$sample <- rownames(panaroo_df)
+
+  panaroo_long <- reshape2::melt(
+    panaroo_df,
+    id.vars = "sample",
+    variable.name = "sample2",
+    value.name = "distance"
+  )
+
+  panaroo_long$sample <- factor(panaroo_long$sample, levels = rev(sample_order))
+  panaroo_long$sample2 <- factor(panaroo_long$sample2, levels = sample_order)
+
+  panaroo_long <- panaroo_long |>
+    dplyr::mutate(
+      fill_distance = dplyr::case_when(
+        distance <= 25 ~ 25,
+        distance > 10000 ~ 10000,
+        TRUE ~ distance
+      ),
+      label_distance = dplyr::case_when(
+        distance > 10000 ~ "10k+",
+        TRUE ~ as.character(distance)
+      )
+    )
+
+  sample_map <- stats::setNames(sample_labels, sample_order)
+
+  ggplot2::ggplot(panaroo_long, ggplot2::aes(x = sample2, y = sample, fill = fill_distance)) +
+    ggplot2::geom_tile(color = "black") +
+    ggplot2::geom_text(ggplot2::aes(label = label_distance), size = 4) +
+    ggplot2::scale_fill_gradientn(
+      colours = c("#660033", "red3", "red", "#FFCC99"),
+      values = scales::rescale(c(25, 26, 1000, 10000)),
+      limits = c(25, 10000),
+      oob = scales::squish,
+      name = "SNP distance",
+      breaks = c(25, 1000, 5000, 10000),
+      labels = c("≤25", "1000", "5000", "10k+")
+    ) +
+    ggplot2::scale_x_discrete(labels = sample_map) +
+    ggplot2::scale_y_discrete(labels = rev(sample_map)) +
+    ggplot2::labs(
+      title = "Distancia SNP - Core gene alignment",
+      x = NULL,
+      y = NULL
+    ) +
+    ggplot2::guides(
+      fill = ggplot2::guide_colorbar(
+        title.position = "top",
+        title.hjust = 0.5,
+        barheight = grid::unit(8, "cm"),
+        barwidth = grid::unit(1.4, "cm"),
+        frame.colour = "black",
+        ticks.colour = "black"
+      )
+    ) +
+    ggplot2::theme_minimal() +
+    ggplot2::theme(
+      axis.text.x = ggplot2::element_text(angle = 90, hjust = 1, size = 12, face = "bold"),
+      axis.text.y = ggplot2::element_text(size = 12, face = "bold"),
+      panel.grid = ggplot2::element_blank(),
+      legend.title = ggplot2::element_text(size = 18, face = "bold"),
+      legend.text = ggplot2::element_text(size = 14, face = "bold"),
+      legend.spacing.y = grid::unit(0.4, "cm"),
+      legend.margin = ggplot2::margin(10, 10, 10, 10)
+    )
+
+} else {
+  cat("No se encontró la matriz de distancia SNP generada por core gene alignment.\n\n")
+}
+```
+
+## Análisis de relación genómica - árbol filogenetico
+
+```{r, fig.width=18, fig.height=14}
+# tree viz, comment out what your not using
+# Normal tree
+#ggtree(tree, layout = "rectangular") + geom_tiplab()
+
+# Tree that excludes specified sequences (specify here)
+tree_pruned <- drop.tip(tree, c("Acinetobacter_baumannii_GCF_009035845.1.fna.gz","Acinetobacter_baumannii_GCF_008632635.1.fna.gz"))
+
+# Pruned tree
+ggtree(tree_pruned, layout = "rectangular") + geom_tiplab()
+
+```

@@ -1,0 +1,117 @@
+---
+title: "Reporte de Tipificación de Influenza A Automatizado"
+subtitle: "Resultados de Tipificación Generados por el Laboratorio de Genómica - ILSP"
+author: "Edwin Daniel Navarro Monserrat, PhD"
+date: today
+format:
+  html:
+    toc: true
+    toc-title: "![](logo_dept_salud.png){height=100px}"
+    toc-location: left
+    page-layout: full
+    number-sections: true
+    embed-resources: true
+
+  pdf:
+    toc: true
+    number-sections: true
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+## Introducción
+
+Este reporte resumen los resultados de tipificación utilizando Nextclade (<https://github.com/nextstrain/nextclade>).
+
+## Analisis bioinformáticos
+
+Se utilizó el pipeline bioinformático MIRA v 2.0.0 (<https://cdcgov.github.io/MIRA/>). El mismo tiene herramientas internas que permiten el ensamblaje de genomas, la observación de criterios de calidad, y la tipificacion de HA y NA (p.ej. H1/H3; N1/N2). Luego se utilizó las secuencias de HA generadas como *input* para Nextclade v 3.19.0, el cual se utiliza para tipificación de subtipo, clados y subclados. Los resultados son procesados en R y se usó Quarto para la generación de este reporte.
+
+```{r}
+#| include: false
+library(tidyverse)
+library(kableExtra)
+
+results_file <- "~/Analisis_bioinformaticos/Influenza_reports/influenza_typing_summary.csv"
+results_df <- read_csv(results_file, show_col_types = FALSE)
+```
+
+## Resumen de muestras analizadas
+
+```{r}
+summary_df <- tibble(
+  Metric = c("Total de muestras","Muestras unicas"),
+  Value = c(nrow(results_df), n_distinct(results_df$`Sample ID`))
+)
+```
+
+```{r}
+summary_df |>
+  kbl(
+    caption = "Resumen de muestras analizadas",
+    booktabs = TRUE
+  )
+```
+
+## Resumen control de calidad
+
+```{r}
+qc_summary <- results_df |>
+  count(qc.overallStatus, name = "Count") |>
+  arrange(desc(Count))
+
+qc_summary |>
+  kbl(
+    caption = "Resumen de resultados de QC",
+    booktabs = TRUE
+  )
+```
+
+## Resultados de tipificación: subtipo HA/NA
+
+```{r}
+typing_df <- read_tsv("~/Analisis_bioinformaticos/Influenza_reports/typing_report.tsv", show_col_types = FALSE)
+
+typing_df |>
+  kbl(
+    caption = "Resultados de tipificación de Influenza",
+    booktabs = TRUE,
+    longtable = TRUE
+  ) |>
+  kable_styling(
+    latex_options = c("repeat_header","striped"),
+    full_width = FALSE
+  )
+```
+
+## Resultados de tipificación: clados y subclados
+
+```{r}
+results_df |>
+  kbl(
+    caption = "Resultado de clados y subclados",
+    booktabs = TRUE,
+    longtable = TRUE
+  ) |>
+  kable_styling(
+    latex_options = c("repeat_header","striped"),
+    full_width = FALSE
+  )
+```
+
+## No. de muestras por subtipo
+
+```{r}
+counts_df <- typing_df |> count(IRMA_subtype)
+
+counts_df |> 
+  kbl(caption = "Numero de subtipos confirmados a traves de IRMA",
+      booktabs = T,
+      longtable = T) |> 
+    kable_styling(
+    latex_options = c("repeat_header","striped"),
+    full_width = T
+  )
+```
