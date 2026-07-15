@@ -1,7 +1,7 @@
 #!/bin/bash
 # ==========================================
 # Bash wrapper script that combines PHoeNIx + grandeur
-# PHoNIx gives genome assembly + NCBI submission components
+# PHoeNIx gives genome assembly + NCBI submission components
 # Grandeur gives MSA, SNPdist, and some extra stuff
 #
 # Usage:
@@ -56,7 +56,6 @@ GRANDEUR_EXTRA_ARGS=("$@")
 mkdir -p "$OUTROOT"
 
 # ---------- requirements ----------
-need_cmd staphb-tk
 need_cmd realpath
 need_cmd find
 need_cmd awk
@@ -88,13 +87,15 @@ GRANDEUR_OUT="$OUTROOT/grandeur"
 mkdir -p "$PHX_OUT" "$GRANDEUR_FASTAS" "$GRANDEUR_OUT"
 
 # ---------- config ----------
-KRAKEN_DB="$HOME/assets/CDCgov/phoenix/assets/databases/"
+KRAKEN_DB="/home/edwin/.nextflow/assets/CDCgov/phoenix/assets/databases/"
 echo "[INFO] Using Kraken2 DB at: $KRAKEN_DB"
 
 # ---------- run PHoeNIx ----------
 echo "[INFO] Launching PHoeNIx on reads..."
-staphb-tk phoenix \
-    -entry PHOENIX \
+export NXF_VER=25.10.2
+nextflow run /home/edwin/.nextflow/assets/CDCgov/phoenix  \
+    -profile docker \
+    --mode PHOENIX \
     --input "$INPUT" \
     --kraken2db "$KRAKEN_DB" \
     --outdir "$PHX_OUT" \
@@ -156,11 +157,15 @@ echo "[INFO] Collected $FOUND assemblies into: $GRANDEUR_FASTAS"
 
 # ---------- run Grandeur ----------
 echo "[INFO] Launching Grandeur on PHoeNIx assemblies..."
+
 if [ "${#GRANDEUR_EXTRA_ARGS[@]}" -gt 0 ]; then
     echo "[INFO] Extra Grandeur args: ${GRANDEUR_EXTRA_ARGS[*]}"
 fi
 
-staphb-tk grandeur \
+
+NXF_OFFLINE=true nextflow run /home/edwin/.nextflow/assets/UPHL-BioNGS/Grandeur \
+    -profile docker \
+    --mode GRANDEUR \
     --fastas "$GRANDEUR_FASTAS" \
     --outdir "$GRANDEUR_OUT" \
     "${GRANDEUR_EXTRA_ARGS[@]}"
