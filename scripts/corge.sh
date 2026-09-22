@@ -4,10 +4,11 @@
 # Nextflow + Docker
 #
 # Usage:
-#   bash corge.sh run manifest.csv /path/to/output
+#   bash corge.sh run manifest.csv /path/to/output [metadata.csv]
 #
-# Example:
+# Examples:
 #   bash corge.sh run manifest.csv corge_results
+#   bash corge.sh run manifest.csv corge_results metadata.csv
 #
 # Written by Edwin Navarro Monserrat
 # ==========================================
@@ -44,13 +45,14 @@ SCHEMA_CSV="$CORGE_REPO/cgmlst_schemas.csv"
 [[ -f "$SCHEMA_CSV" ]] || die "cgMLST schema CSV not found: $SCHEMA_CSV"
 
 # ---------- arguments ----------
-if [[ "$#" -ne 3 ]]; then
+if [[ "$#" -lt 3 || "$#" -gt 4 ]]; then
     echo
     echo "Usage:"
-    echo "  $0 run /path/to/manifest.csv /path/to/output"
+    echo "  $0 run /path/to/manifest.csv /path/to/output [metadata.csv]"
     echo
-    echo "Example:"
+    echo "Examples:"
     echo "  $0 run manifest.csv corge_results"
+    echo "  $0 run manifest.csv corge_results metadata.csv"
     echo
     exit 1
 fi
@@ -65,6 +67,14 @@ mkdir -p "$3"
 OUTDIR="$(realpath "$3")"
 
 [[ -f "$MANIFEST" ]] || die "Manifest not found: $MANIFEST"
+
+# ---------- optional metadata ----------
+METADATA=""
+
+if [[ "$#" -eq 4 ]]; then
+    METADATA="$(realpath "$4")"
+    [[ -f "$METADATA" ]] || die "Metadata not found: $METADATA"
+fi
 
 # ---------- resources ----------
 TOTAL_CPUS=$(nproc)
@@ -87,11 +97,19 @@ export NXF_DEFAULT_MEMORY="${USE_MEM_GB}.GB"
 # Match the local Nextflow version used by the other workflows
 export NXF_VER=25.10.2
 
+# ---------- run information ----------
 echo
 echo "[INFO] CorGe repository: $CORGE_REPO"
 echo "[INFO] Manifest:         $MANIFEST"
 echo "[INFO] Schemas:          $SCHEMA_CSV"
 echo "[INFO] Output:           $OUTDIR"
+
+if [[ -n "$METADATA" ]]; then
+    echo "[INFO] Metadata:         $METADATA"
+else
+    echo "[INFO] Metadata:         none"
+fi
+
 echo
 echo "[INFO] Detected CPUs:    $TOTAL_CPUS"
 echo "[INFO] Using CPUs:       $USE_CPUS"
@@ -134,6 +152,23 @@ if [[ "$MISSING" -gt 0 ]]; then
     die "$MISSING cgMLST schema path(s) could not be found."
 fi
 
+# ---------- build CorGe arguments ----------
+CORGE_ARGS=(
+    -profile docker
+    --input "$MANIFEST"
+    --cgmlst_schemas "$SCHEMA_CSV"
+    --outdir "$OUTDIR"
+    --max_cpus "$USE_CPUS"
+    --max_memory "${USE_MEM_GB}.GB"
+)
+
+# Add metadata only when provided
+if [[ -n "$METADATA" ]]; then
+    CORGE_ARGS+=(
+        --metadata "$METADATA"
+    )
+fi
+
 # ---------- run CorGe ----------
 echo
 echo "=========================================="
@@ -142,12 +177,7 @@ echo "=========================================="
 echo
 
 nextflow run "$CORGE_REPO" \
-    -profile docker \
-    --input "$MANIFEST" \
-    --cgmlst_schemas "$SCHEMA_CSV" \
-    --outdir "$OUTDIR" \
-    --max_cpus "$USE_CPUS" \
-    --max_memory "${USE_MEM_GB}.GB" \
+    "${CORGE_ARGS[@]}" \
     -resume
 
 echo
